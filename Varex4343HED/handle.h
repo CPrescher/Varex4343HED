@@ -7,9 +7,9 @@
 
 void handle_connection(SOCKET s, std::vector<varex::Detector>* p_detectors);
 
-void handle_command(const std::string& command, std::vector<varex::Detector>* p_detectors);
-void set_param(varex::Detector& detector, const std::vector<std::string>& command_parts);
-void get_param(int det_index, const std::vector<std::string>& command_parts);
+void handle_command(SOCKET s, std::vector<varex::Detector>* p_detectors, const std::string& command);
+void set_param(SOCKET s, varex::Detector& detector, const std::vector<std::string>& command_parts);
+void get_param(SOCKET s, varex::Detector& detector, const std::vector<std::string>& command_parts);
 
 
 std::string read_command(const char* recv_buffer);

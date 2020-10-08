@@ -25,41 +25,41 @@ void handle_connection(SOCKET s, std::vector<varex::Detector>* p_detectors)
 	while (recv(s, recv_buffer, c_recv_buffer_size - 1, NULL) > 0) {
 		string command = read_command(recv_buffer);
 		try {
-			handle_command(command, p_detectors);
-			send_success(s);
+			handle_command(s, p_detectors, command);
+			//send_success(s);
 		}
 		catch(const std::exception& e) {
 			std::cout << "Unable to understand command: " << command << std::endl;
 			std::cout << "Exception: " << e.what() << std::endl;
-			send_failed(s);
+			//send_failed(s);
 		};
 	}
 	std::cout << "Connection was closed by the client" << std::endl;
 }
 
-void handle_command(const string& command, std::vector<varex::Detector>* p_detectors) {
+void handle_command(SOCKET s, std::vector<varex::Detector>* p_detectors, const string& command) {
 	vector<string> command_parts = split_command(command);
 	int det_index = stoi(command_parts.at(1));
 	string verb = command_parts.at(2);
 
 	if (verb == "set") {
-		set_param(p_detectors->at(det_index), command_parts);
+		set_param(s, p_detectors->at(det_index), command_parts);
 	}
 	else if (verb == "get") {
-		get_param(det_index, command_parts);
+		get_param(s, p_detectors->at(det_index), command_parts);
 	}
 	else if (verb == "start_acquisition") {
-		varex_server::start_collection(det_index);
+		p_detectors->at(det_index).start_acquisition();
 	}
 	else if (verb == "stop_acquisition") {
-		varex_server::stop_collection(det_index);
+		p_detectors->at(det_index).stop_acquisition();
 	}
 	else {
 		std::cout << "Unable to understand command: " << command << std::endl;
 	}
 }
 
-void set_param(varex::Detector& detector, const vector<string>& command_parts) {
+void set_param(SOCKET s, varex::Detector& detector, const vector<string>& command_parts) {
 	string parameter = command_parts.at(3);
 	if (parameter == "gain") {
 		int value = stoi(command_parts.at(4));
@@ -69,29 +69,48 @@ void set_param(varex::Detector& detector, const vector<string>& command_parts) {
 		double value = stod(command_parts.at(4));
 		detector.set_exposure_time(value);
 	}
-	//else if (parameter == "streaming_target") {
-	//	varex_server::set_streaming_target(
-	//		det_index,
-	//		command_parts.at(4).c_str(),
-	//		command_parts.at(5).c_str()
-	//	);
-	//}
-}
-
-void get_param(int det_index, const vector<string>& command_parts) {
-	string parameter = command_parts.at(3);
-	if (parameter == "status") {
-		int status = varex_server::get_status(det_index);
-	}
-	else if (parameter == "gain") {
-		int gain = varex_server::get_gain(det_index);
-	}
-	else if (parameter == "exposure_time") {
-		double exposure_time = varex_server::get_exposure_time(det_index);
+	else if (parameter == "trigger_mode") {
+		int value = stoi(command_parts.at(4));
+		if (value) {
+			detector.enable_external_trigger();
+		}
+		else {
+			detector.enable_internal_trigger();
+		}
 	}
 	else if (parameter == "streaming_target") {
-		string target = varex_server::get_streaming_target(det_index);
+		detector.set_streaming_target(command_parts.at(4), stoi(command_parts.at(5)));
 	}
+	else {
+
+	}
+}
+
+void get_param(SOCKET s, varex::Detector& detector, const vector<string>& command_parts) {
+	string parameter = command_parts.at(3);
+	if (parameter == "status") {
+		char status = (char)detector.get_status();
+		send(s, (char *)&status, sizeof(status), NULL);
+	}
+	else if (parameter == "gain") {
+		char gain = detector.get_gain();
+		std::cout << "Gain requested." << std::endl;
+		send(s, &gain, sizeof(gain), NULL);
+	}
+	else if (parameter == "exposure_time") {
+		int exposure_time = detector.get_exposure_time();
+		std::cout << "Exposure time requested." << std::endl;
+		send(s, (char*)&exposure_time, sizeof(exposure_time), NULL);
+	}
+	else if (parameter == "trigger_mode") {
+		char trigger_mode = (char)detector.get_trigger_mode();
+		std::cout << "Trigger mode requested." << std::endl;
+		send(s, (char*)&trigger_mode, sizeof(trigger_mode), NULL);
+	}
+	/*
+	else if (parameter == "streaming_target") {
+		string target = varex_server::get_streaming_target(det_index);
+	}*/
 	// still needs to send it back...
 }
 

@@ -1,7 +1,9 @@
 #include "varex.h"
 #include "train_info.h"
+#include "server.h"
 #include <iostream>
 #include <vector>
+#include <string>
 
 namespace varex {
 	std::vector<Detector> get_detectors() {
@@ -15,10 +17,10 @@ namespace varex {
 		for (int i = 0; i < num_detectors; i++) {
 			varex::Detector* detector = new Detector();
 			varex::get_next_varex(desc_pos, i, *detector);
-			detectors.push_back(*detector);
 			detector->enable_internal_trigger();
 			detector->set_exposure_time(100);
-			detector->start_acquisition();
+			//detector->start_acquisition();
+			detectors.push_back(*detector);
 		}
 		return detectors;
 	}
@@ -63,8 +65,6 @@ namespace varex {
 
 		detector.id = index;
 		detector.handle = detector_handle;
-		detector.gain = STDGAIN;
-		detector.state = varex::Idle;
 		detector.rows = rows;
 		detector.columns = columns;
 		detector.buff_frames = BUFFERSPERDET;
@@ -92,10 +92,21 @@ namespace varex {
 		}
 	}
 
-	Detector::Detector() {}
-	void Detector::set_exposure_time(unsigned int milli_seconds) {
-		DWORD exposure_time = milli_seconds * 1000; // set in microseconds 
-		if (Acquisition_SetTimerSync(handle, &exposure_time) == HIS_ALL_OK) {
+	Detector::Detector() {
+		state = varex::AcquisitionState::Idle;
+		trigger_mode = varex::TriggerMode::Internal;
+		gain = STDGAIN;
+		exposure_time = 12;
+	}
+
+	varex::AcquisitionState Detector::get_status() {
+		return state;
+	}
+
+	void Detector::set_exposure_time(uint32_t milli_seconds) {
+		exposure_time = milli_seconds;
+		DWORD sync_time = milli_seconds * 1000; // set in microseconds 
+		if (Acquisition_SetTimerSync(handle, &sync_time) == HIS_ALL_OK) {
 			std::cout << "Exposure time for Varex " << id <<" set to: " 
 				<< milli_seconds << " ms" << std::endl;
 		}
@@ -105,8 +116,12 @@ namespace varex {
 		}
 	}
 
-	void Detector::set_gain(unsigned int gain) {
-		if (gain >= 1 and gain >= 7) {
+	uint32_t Detector::get_exposure_time() {
+		return exposure_time;
+	}
+
+	void Detector::set_gain(uint32_t gain) {
+		if (gain >= 1 and gain <= 7) {
 			if (Acquisition_SetCameraGain(handle, gain) == HIS_ALL_OK) {
 				std::cout << "Gain for Varex " << id << " set to: " 
 					<< gain << std::endl;
@@ -121,14 +136,74 @@ namespace varex {
 				<< ". Value is out of range=[1, 7])" << std::endl;
 		}
 	}
+
+	int Detector::get_gain() {
+		return gain;
+	}
+
+
 	void Detector::enable_external_trigger() {
-		Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_EXTERNAL_TRIGGER);
+		if (Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_EXTERNAL_TRIGGER) 
+			== HIS_ALL_OK)
+		{
+			std::cout << "Set Varex " << id << 
+				" to external trigger " << std::endl;
+			trigger_mode = varex::TriggerMode::External;
+		}
+		else 
+		{
+			std::cout << "Failed to set Varex " << id <<
+				" to external trigger " << std::endl;
+		}
 	}
 	void Detector::enable_internal_trigger() {
-		Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_INTERNAL_TIMER);
+		if(Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_INTERNAL_TIMER)
+			== HIS_ALL_OK)
+		{
+			std::cout << "Set Varex " << id <<
+				" to internal trigger " << std::endl;
+			trigger_mode = varex::TriggerMode::Internal;
+		}
+		else
+		{
+		std::cout << "Failed to set Varex " << id <<
+			" to internal trigger " << std::endl;
+		}
 	}
+
+	varex::TriggerMode Detector::get_trigger_mode() {
+		return trigger_mode;
+	}
+
 	void Detector::start_acquisition() {
-		Acquisition_Acquire_Image(handle, 1, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL);
+		if (Acquisition_Acquire_Image(handle, 1, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL)
+			== HIS_ALL_OK)
+		{
+			std::cout << "Start acquisition for Varex " << id << "." << std::endl;
+			state = AcquisitionState::Collecting;
+		}
+		else {
+			std::cout << "Failed to start acquisition for Varex " << id 
+					  << "." << std::endl;
+		}
+	}
+	void Detector::stop_acquisition() {
+		if (Acquisition_Abort(handle) == HIS_ALL_OK)
+		{
+			std::cout << "Stopped acquisition for Varex " << id << "." << std::endl;
+			state = AcquisitionState::Idle;
+		}
+		else 
+		{
+			std::cout << "Failed to stop acquisition for Varex " << id 
+				      << "." << std::endl;
+		}
+	}
+
+	void Detector::set_streaming_target(const std::string& address, const std::string& port) {
+		std::cout << "Setting Streaming Target to: " << address <<":" << port << std::endl;
+		/*struct addrinfo* servinfo;
+		get_addressinfo(address, port, servinfo);*/
 	}
 
 	void CALLBACK frame_callback(HACQDESC detector_handle) 

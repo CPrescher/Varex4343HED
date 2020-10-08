@@ -2,6 +2,7 @@
 #include "Acq.h"
 #include <exception>
 #include <vector>
+#include <string>
 
 #define STDGAIN 4
 
@@ -17,14 +18,17 @@ typedef UINT16 PixelT;
 #define BYTESPERBUFFER(detdescp) (PIXELSPERBUFFER(detdescp) * sizeof(PixelT))
 
 namespace varex {
-	enum AcquisitionState {
-		Idle = 0, InProgress, Live
+	enum class AcquisitionState {
+		Idle=0, Collecting,
+	};
+
+	enum class TriggerMode {
+		Internal=0, External
 	};
 
 	struct Detector {
 		HACQDESC handle;
 		UINT id;
-		enum AcquisitionState state;
 		PixelT* acqbuffP;
 		PixelT* liveframeP;
 		UINT16 buff_frames;
@@ -34,11 +38,25 @@ namespace varex {
 
 		Detector();
 
-		void set_exposure_time(unsigned int milli_seconds);
-		void set_gain(unsigned int gain);
+		void set_exposure_time(uint32_t milli_seconds);
+		void set_gain(uint32_t gain);
 		void enable_internal_trigger();
 		void enable_external_trigger();
+		TriggerMode get_trigger_mode();
 		void start_acquisition();
+		void stop_acquisition();
+
+		void set_streaming_target(const std::string& ip, const std::string& port);
+
+		AcquisitionState get_status();
+		uint32_t get_exposure_time();
+		int get_gain();
+
+	private:
+		uint32_t exposure_time; // in ms;
+		enum AcquisitionState state;
+		enum TriggerMode trigger_mode;
+		SOCKET streaming_socket;
 	};
 
 	std::vector<Detector> get_detectors();

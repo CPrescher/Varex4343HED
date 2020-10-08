@@ -146,7 +146,6 @@
     <ClCompile Include="handle.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="server.cpp" />
-    <ClCompile Include="varex_server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TrainIdLib\TrainIdLib.vcxproj">
@@ -159,7 +158,6 @@
   <ItemGroup>
     <ClInclude Include="handle.h" />
     <ClInclude Include="server.h" />
-    <ClInclude Include="varex_server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

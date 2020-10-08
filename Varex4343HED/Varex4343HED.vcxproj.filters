@@ -24,18 +24,12 @@
     <ClCompile Include="server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="varex_server.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="handle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="server.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="varex_server.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

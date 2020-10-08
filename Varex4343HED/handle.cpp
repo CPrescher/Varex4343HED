@@ -1,6 +1,5 @@
 #include "server.h"
 #include "varex.h"
-#include "varex_server.h"
 #include "handle.h"
 #include <vector>
 #include <string>
@@ -79,7 +78,7 @@ void set_param(SOCKET s, varex::Detector& detector, const vector<string>& comman
 		}
 	}
 	else if (parameter == "streaming_target") {
-		detector.set_streaming_target(command_parts.at(4), stoi(command_parts.at(5)));
+		detector.set_streaming_target(command_parts.at(4), command_parts.at(5));
 	}
 	else {
 

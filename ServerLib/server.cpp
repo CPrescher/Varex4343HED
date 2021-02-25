@@ -52,14 +52,40 @@ SOCKET start_listening(addrinfo*& server_info)
 
 
 SOCKET start_server(const char* address, const char* port)
-// starts the windows socket implementation and listening on given address
-// and port. Standard address should be "0.0.0.0" to discover the server from
+// Creates a socket listening on given address and port. 
+// Standard address should be "0.0.0.0" to discover the server from
 // outside
 {
-	start_WSA();
 	struct addrinfo* servinfo;
 	get_addressinfo(address, port, servinfo);
 	return start_listening(servinfo);
+}
+
+SOCKET connect_to_server(const char* address, const char* port)
+// Creates a socket connected to a server with given address and port
+{
+	struct addrinfo* server_info;
+	get_addressinfo(address, port, server_info);
+	return create_client_socket(server_info);
+}
+
+SOCKET create_client_socket(addrinfo*& server_info)
+{
+	SOCKET s;
+	s = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+	char optval = 1;
+	DWORD doptval = 1;
+	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+	setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char*)&doptval, sizeof(doptval));
+
+	if (s < 0) {
+		throw std::runtime_error("Could not create socket!");
+	}
+
+	if (connect(s, server_info->ai_addr, server_info->ai_addrlen) == -1) {
+		throw std::runtime_error("Could not connect to server!");
+	};
+	return s;
 }
 
 SOCKET accept_client(SOCKET server_socket)

@@ -18,3 +18,6 @@ std::string get_client_ip(SOCKET s);
 SOCKET start_listening(addrinfo*& servinfo);
 SOCKET start_server(const char* address, const char* port);
 SOCKET accept_client(SOCKET server_socket);
+
+SOCKET connect_to_server(const char* address, const char* port);
+SOCKET create_client_socket(addrinfo*& server_info);

@@ -11,6 +11,8 @@ int main() {
 	try {
 		TrainUSB::start_update_train_info_thread();
 		std::vector<varex::Detector> detectors = varex::get_detectors();
+		//varex::enable_logging();
+		start_WSA();
 		SOCKET entry_socket = start_server("0.0.0.0", "3490");
 
 		while (true) 

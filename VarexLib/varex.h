@@ -9,7 +9,7 @@
 typedef UINT16 PixelT;
 
 #define BUFALIGNMENT 4096
-#define BUFFERSPERDET 256
+#define BUFFERSPERDET 10
 
 #define PIXELSPERFRAME(detdescp) ((((UINT64)((detdescp)->rows)) * ((UINT64)((detdescp)->columns))))
 #define BYTESPERFRAME(detdescp) (PIXELSPERFRAME(detdescp) * sizeof(PixelT))
@@ -47,6 +47,7 @@ namespace varex {
 		void stop_acquisition();
 
 		void set_streaming_target(const std::string& ip, const std::string& port);
+		void send_image(bool with_train_id = false);
 
 		AcquisitionState get_status();
 		uint32_t get_exposure_time();
@@ -57,6 +58,8 @@ namespace varex {
 		enum AcquisitionState state;
 		enum TriggerMode trigger_mode;
 		SOCKET streaming_socket;
+		std::string streaming_address;
+		std::string streaming_port;
 	};
 
 	std::vector<Detector> get_detectors();
@@ -69,4 +72,6 @@ namespace varex {
 	public: 
 		VarexException(const char* msg) : std::exception(msg) {};
 	};
+
+	long enable_logging();
 }

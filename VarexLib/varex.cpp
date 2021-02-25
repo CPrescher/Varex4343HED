@@ -1,10 +1,14 @@
+#include "server.h"
 #include "varex.h"
 #include "train_info.h"
 #include <iostream>
 #include <vector>
 #include <string>
 
+
 namespace varex {
+	__int64 frame_count = 0;
+
 	std::vector<Detector> get_detectors() {
 		std::cout << "Initializing detectors..." << std::endl;
 		unsigned int num_detectors = get_detector_num();
@@ -18,7 +22,7 @@ namespace varex {
 			varex::get_next_varex(desc_pos, i, *detector);
 			detector->enable_internal_trigger();
 			detector->set_exposure_time(100);
-			//detector->start_acquisition();
+			detector->start_acquisition();
 			detectors.push_back(*detector);
 		}
 		return detectors;
@@ -67,10 +71,8 @@ namespace varex {
 		detector.rows = rows;
 		detector.columns = columns;
 		detector.buff_frames = BUFFERSPERDET;
-		detector.liveframeP = (PixelT*)_aligned_malloc(BYTESPERFRAME(&detector), BUFALIGNMENT);
 		detector.acqbuffP = (PixelT*)_aligned_malloc(BYTESPERBUFFER(&detector), BUFALIGNMENT);
-		if (detector.liveframeP != 0 and detector.acqbuffP != 0) {
-			memset(detector.liveframeP, 0, BYTESPERFRAME(&detector));
+		if (detector.acqbuffP != 0) {
 			memset(detector.acqbuffP, 0, BYTESPERBUFFER(&detector));
 		}
 		else {
@@ -96,6 +98,9 @@ namespace varex {
 		trigger_mode = varex::TriggerMode::Internal;
 		gain = STDGAIN;
 		exposure_time = 12;
+		streaming_socket = NULL;
+		streaming_address = "";
+		streaming_port = "";
 	}
 
 	varex::AcquisitionState Detector::get_status() {
@@ -175,7 +180,7 @@ namespace varex {
 	}
 
 	void Detector::start_acquisition() {
-		if (Acquisition_Acquire_Image(handle, 1, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL)
+		if (Acquisition_Acquire_Image(handle, 10, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL)
 			== HIS_ALL_OK)
 		{
 			std::cout << "Start acquisition for Varex " << id << "." << std::endl;
@@ -199,10 +204,51 @@ namespace varex {
 		}
 	}
 
+
+	void Detector::send_image(bool with_train_id) {
+		if (streaming_address == "") {
+			return;
+		}
+
+		__int64 train_id = TrainUSB::get_current_train_id();
+		if (streaming_socket) { 
+			 set_streaming_target(streaming_address, streaming_port);
+		}
+		if (with_train_id and streaming_socket != NULL) {
+			if (send(streaming_socket, (char*)&train_id, sizeof(&train_id), 0) != SOCKET_ERROR) {
+				std::cout << "Sent train_id: " << train_id << std::endl;
+			}
+			else {
+				std::cout << "ERROR: could not send train_id: " << train_id << std::endl;
+			}
+		}
+		int image_size = rows * columns * sizeof(PixelT);
+		if (send(streaming_socket, (char*)acqbuffP, image_size, 0) == SOCKET_ERROR) {
+			std::cout << "ERROR: could not send image to streaming target!" << std::endl;
+		}
+		
+	}
+
+
 	void Detector::set_streaming_target(const std::string& address, const std::string& port) {
 		std::cout << "Setting Streaming Target to: " << address <<":" << port << std::endl;
-		/*struct addrinfo* servinfo;
-		get_addressinfo(address, port, servinfo);*/
+		if (streaming_socket){ closesocket(streaming_socket); } //close old socket
+
+		try {
+			streaming_socket = connect_to_server(address.c_str(), port.c_str());
+			std::cout << "Connected to server: " << address << ":" << port << std::endl;
+			streaming_address = address;
+			streaming_port = port;
+		}
+		catch (const std::exception& e) {
+			std::cout << "Could not connect to server: " << address << ":" << port << std::endl;
+			std::cout << "Exception: " << e.what() << std::endl;
+			streaming_socket = NULL;
+		}
+
+		std::cout << "streaming socket: " << streaming_socket << std::endl;
+
+		Acquisition_SetAcqData(handle, this);
 	}
 
 	void CALLBACK frame_callback(HACQDESC detector_handle) 
@@ -217,21 +263,65 @@ namespace varex {
 		DWORD dwActFrame, dwSecFrame;
 		Acquisition_GetActFrame(detector_handle, &dwActFrame, &dwSecFrame);
 
+		detector->send_image(true);
+
 		std::cout
 			<< "Det " << detector->id
-			<< " frame: " << InfoEx.wFrameCnt
+			<< " frame: " << ++frame_count
+			<< ", " <<InfoEx.wFrameCnt
 			<< " exposure time: " << InfoEx.wRealInttime_milliSec << ","
 			<< InfoEx.wRealInttime_microSec << " ms"
 			<< " train id: " << TrainUSB::get_current_train_id()
 			<< std::endl;
+
+		if (InfoEx.wFrameCnt >= 10000) {
+			Acquisition_ResetFrameCnt(detector->handle);
+		}
 
 		if (InfoEx.wFrameCnt == 10) {
 			std::cout << "trying to increase exposure time..." << std::endl;
 			//detector->set_exposure_time(1000);
 			detector->set_exposure_time(100);
 		}
+		Acquisition_SetReady(detector_handle, TRUE);
 	}
 
+	long enable_logging()
+	{
+		unsigned int uiRet = HIS_ALL_OK;
+		BOOL bEnableLoging = TRUE;
+		BOOL consoleOnOff = TRUE;
+		XislLoggingLevels xislLogLvl = LEVEL_TRACE;
+		BOOL bPerformanceLogging = FALSE;
 
+		// enable loggin functionality
+		uiRet = Acquisition_EnableLogging(bEnableLoging);
+		if (uiRet != HIS_ALL_OK)
+		{
+			printf("Acquisition_EnableLogging Error nr.: %d", uiRet);
+		}
+
+		// define log outputfile and consolelogging
+		uiRet = Acquisition_SetLogOutput("log.txt", consoleOnOff);
+		if (uiRet != HIS_ALL_OK)
+		{
+			printf("Acquisition_SetLogOutput Error nr.: %d", uiRet);
+		}
+
+		// set the desired log out level
+		uiRet = Acquisition_SetLogLevel(xislLogLvl);
+		if (uiRet != HIS_ALL_OK)
+		{
+			printf("Acquisition_SetLogLevel Error nr.: %d", uiRet);
+		}
+
+		// log Performance which will report the time a function call needs
+		uiRet = Acquisition_TogglePerformanceLogging(bPerformanceLogging);
+		if (uiRet != HIS_ALL_OK)
+		{
+			printf("Acquisition_TogglePerformanceLogging Error nr.: %d", uiRet);
+		}
+		return uiRet;
+	}
 	
 }

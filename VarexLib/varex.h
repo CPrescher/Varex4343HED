@@ -66,7 +66,7 @@ namespace varex {
 
 	std::vector<Detector> get_detectors();
 	unsigned int get_detector_num();
-	void get_next_varex(ACQDESCPOS desc_pos, const int index, Detector& detector);
+	void get_next_varex(ACQDESCPOS* desc_pos, const int index, Detector& detector);
 
 	void CALLBACK frame_callback(HACQDESC detector_handle);
 

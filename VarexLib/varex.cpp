@@ -20,7 +20,7 @@ namespace varex {
 
 		for (int i = 0; i < num_detectors; i++) {
 			varex::Detector* detector = new Detector();
-			varex::get_next_varex(desc_pos, i, *detector);
+			varex::get_next_varex(&desc_pos, i, *detector);
 			detector->enable_internal_trigger();
 			detector->set_exposure_time(100);
 			detector->start_acquisition();
@@ -35,12 +35,12 @@ namespace varex {
 		return uiNumSensors;
 	}
 
-	void get_next_varex(ACQDESCPOS desc_pos, const int index, Detector& detector)
+	void get_next_varex(ACQDESCPOS* desc_pos, const int index, Detector& detector)
 	{
 		HACQDESC detector_handle = NULL;
 		CHwHeaderInfo header_info;
 		CHwHeaderInfoEx header_info_ex;
-		if (Acquisition_GetNextSensor(&desc_pos, &detector_handle) != HIS_ALL_OK) {
+		if (Acquisition_GetNextSensor(desc_pos, &detector_handle) != HIS_ALL_OK) {
 			throw VarexException("Error accessing sensor.");
 		};
 		Acquisition_GetHwHeaderInfoEx(detector_handle, &header_info, &header_info_ex);

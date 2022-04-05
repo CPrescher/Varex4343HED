@@ -1,6 +1,7 @@
 #include "server.h"
 #include "varex.h"
 #include "handle.h"
+#include <plog/Log.h>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -17,8 +18,8 @@ void handle_connection(SOCKET s, std::vector<varex::Detector>* p_detectors)
 {
 	string ip = get_client_ip(s);
 
-	std::cout << ip << " connected. Waiting for Message." << std::endl;
-	std::cout << p_detectors->size() << " detectors are available." << std::endl;
+	PLOGD << ip << " connected. Waiting for Message.";
+	PLOGD << p_detectors->size() << " detectors are available.";
 
 	char recv_buffer[c_recv_buffer_size];
 	while (recv(s, recv_buffer, c_recv_buffer_size - 1, NULL) > 0) {
@@ -28,12 +29,12 @@ void handle_connection(SOCKET s, std::vector<varex::Detector>* p_detectors)
 			//send_success(s);
 		}
 		catch(const std::exception& e) {
-			std::cout << "Unable to understand command: " << command << std::endl;
-			std::cout << "Exception: " << e.what() << std::endl;
+			PLOGD << "Unable to understand command: " << command;
+			PLOGD << "Exception: " << e.what();
 			//send_failed(s);
 		};
 	}
-	std::cout << "Connection was closed by the client" << std::endl;
+	PLOGD << "Connection was closed by the client";
 }
 
 void handle_command(SOCKET s, std::vector<varex::Detector>* p_detectors, const string& command) {
@@ -54,7 +55,7 @@ void handle_command(SOCKET s, std::vector<varex::Detector>* p_detectors, const s
 		p_detectors->at(det_index).stop_acquisition();
 	}
 	else {
-		std::cout << "Unable to understand command: " << command << std::endl;
+		PLOGD << "Unable to understand command: " << command;
 	}
 }
 
@@ -93,17 +94,17 @@ void get_param(SOCKET s, varex::Detector& detector, const vector<string>& comman
 	}
 	else if (parameter == "gain") {
 		char gain = detector.get_gain();
-		std::cout << "Gain requested." << std::endl;
+		PLOGD << "Gain requested.";
 		send(s, &gain, sizeof(gain), NULL);
 	}
 	else if (parameter == "exposure_time") {
 		int exposure_time = detector.get_exposure_time();
-		std::cout << "Exposure time requested." << std::endl;
+		PLOGD << "Exposure time requested.";
 		send(s, (char*)&exposure_time, sizeof(exposure_time), NULL);
 	}
 	else if (parameter == "trigger_mode") {
 		char trigger_mode = (char)detector.get_trigger_mode();
-		std::cout << "Trigger mode requested." << std::endl;
+		PLOGD << "Trigger mode requested.";
 		send(s, (char*)&trigger_mode, sizeof(trigger_mode), NULL);
 	}
 	/*

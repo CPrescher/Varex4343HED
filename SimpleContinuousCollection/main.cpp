@@ -8,7 +8,7 @@ constexpr UINT STDGAIN = 4;
 constexpr UINT BUFALIGNMENT = 4096;
 constexpr UINT ROWS = 2880;
 constexpr UINT COLUMNS = 2880;
-constexpr UINT BUFFER_FRAMES = 10;
+constexpr UINT BUFFER_FRAMES = 1;
 
 __int64 current_frame = 0;  //global frame counter
 

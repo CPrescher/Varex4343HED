@@ -1,6 +1,7 @@
 #include "server.h"
 #include "varex.h"
 #include "train_info.h"
+#include <plog/Log.h>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -10,9 +11,9 @@ namespace varex {
 	__int64 frame_count = 0;
 
 	std::vector<Detector> get_detectors() {
-		std::cout << "Initializing detectors..." << std::endl;
+		PLOGI << "Initializing detectors...";
 		unsigned int num_detectors = get_detector_num();
-		std::cout << "Found " << num_detectors << " detectors." << std::endl;
+		PLOGI << "Found " << num_detectors << " detectors.";
 
 		std::vector<Detector> detectors;
 		ACQDESCPOS desc_pos = 0;
@@ -101,6 +102,7 @@ namespace varex {
 		streaming_socket = NULL;
 		streaming_address = "";
 		streaming_port = "";
+		buff_ind = 0;
 	}
 
 	varex::AcquisitionState Detector::get_status() {
@@ -111,12 +113,12 @@ namespace varex {
 		exposure_time = milli_seconds;
 		DWORD sync_time = milli_seconds * 1000; // set in microseconds 
 		if (Acquisition_SetTimerSync(handle, &sync_time) == HIS_ALL_OK) {
-			std::cout << "Exposure time for Varex " << id <<" set to: " 
-				<< milli_seconds << " ms" << std::endl;
+			PLOGI << "Exposure time for Varex " << id << " set to: "
+				<< milli_seconds << " ms";
 		}
 		else {
-			std::cout << "Failed to set exposure time for Varex " << id << 
-				" to: " << milli_seconds << " ms" << std::endl;
+			PLOGI << "Failed to set exposure time for Varex " << id <<
+				" to: " << milli_seconds << " ms";
 		}
 	}
 
@@ -127,17 +129,16 @@ namespace varex {
 	void Detector::set_gain(uint32_t gain) {
 		if (gain >= 1 and gain <= 7) {
 			if (Acquisition_SetCameraGain(handle, gain) == HIS_ALL_OK) {
-				std::cout << "Gain for Varex " << id << " set to: " 
-					<< gain << std::endl;
+				PLOGI << "Gain for Varex " << id << " set to: "
+					<< gain;
 			}
 			else {
-				std::cout << "Failed to set gain for Varex " << id 
-					<< " to: " << gain << std::endl;
+				PLOGI << "Failed to set gain for Varex " << id
+					<< " to: " << gain;
 			}
 		}
 		else {
-			std::cout << "Could not set gain to " << gain 
-				<< ". Value is out of range=[1, 7])" << std::endl;
+			PLOGI << "Could not set gain to " << gain << ". Value is out of range=[1, 7])";
 		}
 	}
 
@@ -150,28 +151,24 @@ namespace varex {
 		if (Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_EXTERNAL_TRIGGER) 
 			== HIS_ALL_OK)
 		{
-			std::cout << "Set Varex " << id << 
-				" to external trigger " << std::endl;
+			PLOGI << "Set Varex " << id << " to external trigger";
 			trigger_mode = varex::TriggerMode::External;
 		}
 		else 
 		{
-			std::cout << "Failed to set Varex " << id <<
-				" to external trigger " << std::endl;
+			PLOGI << "Failed to set Varex " << id << " to external trigger";
 		}
 	}
 	void Detector::enable_internal_trigger() {
 		if(Acquisition_SetFrameSyncMode(handle, HIS_SYNCMODE_INTERNAL_TIMER)
 			== HIS_ALL_OK)
 		{
-			std::cout << "Set Varex " << id <<
-				" to internal trigger " << std::endl;
+			PLOGI << "Set Varex " << id << " to internal trigger ";
 			trigger_mode = varex::TriggerMode::Internal;
 		}
 		else
 		{
-		std::cout << "Failed to set Varex " << id <<
-			" to internal trigger " << std::endl;
+			PLOGI << "Failed to set Varex " << id << " to internal trigger";
 		}
 	}
 
@@ -180,27 +177,25 @@ namespace varex {
 	}
 
 	void Detector::start_acquisition() {
-		if (Acquisition_Acquire_Image(handle, 10, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL)
+		if (Acquisition_Acquire_Image(handle, buff_frames, 0, HIS_SEQ_CONTINUOUS, NULL, NULL, NULL)
 			== HIS_ALL_OK)
 		{
-			std::cout << "Start acquisition for Varex " << id << "." << std::endl;
+			PLOGI << "Start acquisition for Varex " << id;
 			state = AcquisitionState::Collecting;
 		}
 		else {
-			std::cout << "Failed to start acquisition for Varex " << id 
-					  << "." << std::endl;
+			PLOGI << "Failed to start acquisition for Varex " << id;
 		}
 	}
 	void Detector::stop_acquisition() {
 		if (Acquisition_Abort(handle) == HIS_ALL_OK)
 		{
-			std::cout << "Stopped acquisition for Varex " << id << "." << std::endl;
+			PLOGI << "Stopped acquisition for Varex " << id;
 			state = AcquisitionState::Idle;
 		}
 		else 
 		{
-			std::cout << "Failed to stop acquisition for Varex " << id 
-				      << "." << std::endl;
+			PLOGI << "Failed to stop acquisition for Varex " << id;
 		}
 	}
 
@@ -216,39 +211,47 @@ namespace varex {
 		}
 		if (with_train_id and streaming_socket != NULL) {
 			if (send(streaming_socket, (char*)&train_id, sizeof(&train_id), 0) != SOCKET_ERROR) {
-				std::cout << "Sent train_id: " << train_id << std::endl;
+				PLOGD << "Sent train_id: " << train_id;
 			}
 			else {
-				std::cout << "ERROR: could not send train_id: " << train_id << std::endl;
+				PLOGW << "ERROR: could not send train_id: " << train_id;
 			}
 		}
 		int image_size = rows * columns * sizeof(PixelT);
-		if (send(streaming_socket, (char*)acqbuffP, image_size, 0) == SOCKET_ERROR) {
-			std::cout << "ERROR: could not send image to streaming target!" << std::endl;
+		if (send(streaming_socket, (char*)(acqbuffP + buff_ind * PIXELSPERFRAME(this)), BYTESPERFRAME(this), 0) != SOCKET_ERROR) {
+			
+		}
+		else {
+			PLOGW << "ERROR: could not send image to streaming target!";
 		}
 		
 	}
 
 
 	void Detector::set_streaming_target(const std::string& address, const std::string& port) {
-		std::cout << "Setting Streaming Target to: " << address <<":" << port << std::endl;
+		PLOGD << "Setting Streaming Target to: " << address << ":" << port;
 		if (streaming_socket){ closesocket(streaming_socket); } //close old socket
 
 		try {
 			streaming_socket = connect_to_server(address.c_str(), port.c_str());
-			std::cout << "Connected to server: " << address << ":" << port << std::endl;
+			PLOGD << "Connected to server: " << address << ":" << port;
 			streaming_address = address;
 			streaming_port = port;
 		}
 		catch (const std::exception& e) {
-			std::cout << "Could not connect to server: " << address << ":" << port << std::endl;
-			std::cout << "Exception: " << e.what() << std::endl;
+			PLOGW << "Could not connect to server: " << address << ":" << port;
+			PLOGW << "Exception: " << e.what();
 			streaming_socket = NULL;
 		}
 
-		std::cout << "streaming socket: " << streaming_socket << std::endl;
+		PLOGD << "streaming socket: " << streaming_socket;
 
 		Acquisition_SetAcqData(handle, this);
+	}
+
+	void Detector::increment_buffer_index() {
+		buff_ind++;
+		if (buff_ind == buff_frames) buff_ind = 0;
 	}
 
 	void CALLBACK frame_callback(HACQDESC detector_handle) 
@@ -263,26 +266,18 @@ namespace varex {
 		DWORD dwActFrame, dwSecFrame;
 		Acquisition_GetActFrame(detector_handle, &dwActFrame, &dwSecFrame);
 
-		detector->send_image(true);
 
-		std::cout
+		PLOGI
 			<< "Det " << detector->id
 			<< " frame: " << ++frame_count
-			<< ", " <<InfoEx.wFrameCnt
+			<< ", " << InfoEx.wFrameCnt
 			<< " exposure time: " << InfoEx.wRealInttime_milliSec << ","
 			<< InfoEx.wRealInttime_microSec << " ms"
-			<< " train id: " << TrainUSB::get_current_train_id()
-			<< std::endl;
+			<< " train id: " << TrainUSB::get_current_train_id();
 
-		if (InfoEx.wFrameCnt >= 10000) {
-			Acquisition_ResetFrameCnt(detector->handle);
-		}
+		detector->send_image(true);
 
-		if (InfoEx.wFrameCnt == 10) {
-			std::cout << "trying to increase exposure time..." << std::endl;
-			//detector->set_exposure_time(1000);
-			detector->set_exposure_time(100);
-		}
+		detector->increment_buffer_index();
 		Acquisition_SetReady(detector_handle, TRUE);
 	}
 

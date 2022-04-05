@@ -9,7 +9,7 @@
 typedef UINT16 PixelT;
 
 #define BUFALIGNMENT 4096
-#define BUFFERSPERDET 10
+#define BUFFERSPERDET 50
 
 #define PIXELSPERFRAME(detdescp) ((((UINT64)((detdescp)->rows)) * ((UINT64)((detdescp)->columns))))
 #define BYTESPERFRAME(detdescp) (PIXELSPERFRAME(detdescp) * sizeof(PixelT))
@@ -32,6 +32,7 @@ namespace varex {
 		PixelT* acqbuffP;
 		PixelT* liveframeP;
 		UINT16 buff_frames;
+		UINT16 buff_ind;
 		WORD gain;
 		UINT16 rows, columns;
 		HANDLE acqEndEvent;
@@ -45,6 +46,7 @@ namespace varex {
 		TriggerMode get_trigger_mode();
 		void start_acquisition();
 		void stop_acquisition();
+		void increment_buffer_index();
 
 		void set_streaming_target(const std::string& ip, const std::string& port);
 		void send_image(bool with_train_id = false);

@@ -1,4 +1,5 @@
 #include "server.h"
+#include <plog/Log.h>
 
 long start_WSA()
 // Runs the WSAStartup function with correct parameters and thus, intiates the
@@ -46,7 +47,7 @@ SOCKET start_listening(addrinfo*& server_info)
 	if (listen(s, SOMAXCONN) == -1) {
 		throw std::runtime_error("Could not start listening on socket!");
 	}
-	std::cout << "Socket starts listening!" << std::endl;
+	PLOGD << "Socket starts listening!";
 	return s;
 }
 
@@ -91,7 +92,7 @@ SOCKET create_client_socket(addrinfo*& server_info)
 SOCKET accept_client(SOCKET server_socket)
 // Waits for a client to connect and returns SOCKET value after one has connected.
 {
-	std::cout << "Waiting for new connection." << std::endl;
+	PLOGD << "Waiting for new connection.";
 
 	SOCKET accepted_socket;
 	struct sockaddr_in client_address;

@@ -10,10 +10,12 @@
 #include "train_info.h"
 
 int main() {
-	static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("varex.log", 10000000, 5); // Create the 1st appender.
-	static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender; // Create the 2nd appender.
+	// initalize logging
+	static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("varex.log", 10000000, 5); // Create the 1st appender to file.
+	static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender; // Create the 2nd appender to console.
 	plog::init(plog::info, &fileAppender).addAppender(&consoleAppender); // Initialize the logger with the both appenders.
 
+	// main receiving loop
 	try {
 		TrainUSB::start_update_train_info_thread();
 		std::vector<varex::Detector> detectors = varex::get_detectors();
